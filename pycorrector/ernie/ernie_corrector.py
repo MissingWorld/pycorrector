@@ -19,7 +19,7 @@ from pycorrector.utils.logger import logger
 from pycorrector.corrector import Corrector
 from pycorrector.ernie.modeling_ernie import ErnieModelForPretraining, ErnieModel
 from pycorrector.ernie.tokenizing_ernie import ErnieTokenizer
-from pycorrector.utils.tokenizer import segment
+from pycorrector.utils.tokenizer import segment, split_text_by_maxlen
 
 pwd_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -102,7 +102,7 @@ class ErnieCorrector(Corrector):
         # 编码统一，utf-8 to unicode
         text = convert_to_unicode(text)
         # 长句切分为短句
-        blocks = self.split_text_by_maxlen(text, maxlen=512)
+        blocks = split_text_by_maxlen(text, maxlen=512)
         for blk, start_idx in blocks:
             blk_new = ''
             blk = segment(blk, cut_type=ernie_cut_type, pos=False)
@@ -114,17 +114,14 @@ class ErnieCorrector(Corrector):
                     sentence_new = ' '.join(sentence_lst)
                     # 预测，默认取top5
                     predicts = self.predict_mask(sentence_new)
-                    top_tokens = []
-                    for p in predicts:
-                        top_tokens.append(p.get('token', ''))
-
+                    top_tokens = [p.get('token', '') for p in predicts]
                     if top_tokens and (s not in top_tokens):
                         # 取得所有可能正确的词
                         candidates = self.generate_items(s)
                         if candidates:
                             for token_str in top_tokens:
                                 if token_str in candidates:
-                                    details.append([s, token_str, start_idx + idx, start_idx + idx + 1])
+                                    details.append((s, token_str, start_idx + idx, start_idx + idx + 1))
                                     s = token_str
                                     break
                 blk_new += s

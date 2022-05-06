@@ -5,10 +5,6 @@
 @Author :   Abtion
 @Email  :   abtion{at}outlook.com
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import argparse
 import sys
 
@@ -21,12 +17,12 @@ def main():
     parser = argparse.ArgumentParser()
 
     # Required parameters
-    parser.add_argument("--bert_model_dir", default=config.macbert_model_dir,
+    parser.add_argument("--macbert_model_dir", default=config.macbert_model_dir,
                         type=str,
-                        help="Bert pre-trained model dir")
+                        help="MacBert pre-trained model dir")
     args = parser.parse_args()
 
-    nlp = MacBertCorrector(args.bert_model_dir).macbert_correct
+    nlp = MacBertCorrector(args.macbert_model_dir).macbert_correct
 
     i = nlp('今天新情很好')
     print(i)
@@ -34,11 +30,14 @@ def main():
     i = nlp('少先队员英该为老人让座')
     print(i)
 
-    i = nlp('机器学习是人工智能领遇最能体现智能的一个分知')
+    i = nlp('机器学习是人工智能领遇最能体现智能的一个分知。')
     print(i)
 
-    i = nlp('机其学习是人工智能领遇最能体现智能的一个分知')
+    i = nlp('机其学习是人工智能领遇最能体现智能的一个分知。')
     print(i)
+
+    print(nlp('老是较书。'))
+    print(nlp('遇到一位很棒的奴生跟我聊天。'))
 
 
 if __name__ == "__main__":

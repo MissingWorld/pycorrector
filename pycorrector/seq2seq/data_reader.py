@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-# Author: XuMing(xuming624@qq.com)
-# Brief: Corpus for model
+"""
+@author:XuMing(xuming624@qq.com)
+@description:
+""" Corpus for model
 
 import sys
 from codecs import open
@@ -51,6 +53,20 @@ def read_vocab(input_texts, max_size=None, min_count=0):
 
 def max_length(tensor):
     return max(len(t) for t in tensor)
+
+
+def load_bert_data(path, use_segment, num_examples=None):
+    lines = open(path, 'r', encoding='utf-8').read().strip().split('\n')
+    src_trg_lines = []
+
+    for line in lines[:num_examples]:
+        terms = line.split('\t')
+        if len(terms) != 2:
+            continue
+        src = terms[0].replace(' ', '') if use_segment else terms[0]
+        trg = terms[1].replace(' ', '') if use_segment else terms[1]
+        src_trg_lines.append([src, trg])
+    return src_trg_lines
 
 
 def create_dataset(path, num_examples=None):

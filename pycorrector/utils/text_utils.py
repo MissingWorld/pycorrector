@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-# Author: XuMing(xuming624@qq.com)
-# Brief: 汉字处理的工具:判断unicode是否是汉字，数字，英文，或者其他字符。以及全角符号转半角符号。
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+"""
+@author:XuMing(xuming624@qq.com)
+@description: 汉字处理的工具:判断unicode是否是汉字，数字，英文，或者其他字符。以及全角符号转半角符号。
+"""
 
 import re
 
@@ -56,7 +55,7 @@ def is_alphabet(uchar):
 
 def is_alphabet_string(string):
     """判断是否全部为英文字母"""
-    return all('a' <= c <= 'z' for c in string)
+    return all(is_alphabet(c) for c in string)
 
 
 def is_other(uchar):
@@ -173,3 +172,5 @@ if __name__ == "__main__":
     traditional_sentence = '憂郁的臺灣烏龜'
     simplified_sentence = traditional2simplified(traditional_sentence)
     print(traditional_sentence, simplified_sentence)
+    print(is_alphabet_string('Teacher'))
+    print(is_alphabet_string('Teacher '))

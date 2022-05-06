@@ -1,31 +1,27 @@
 # -*- coding: utf-8 -*-
-# Author: XuMing(xuming624@qq.com)
-# Brief: error word detector
-
-import codecs
+"""
+@author:XuMing(xuming624@qq.com)
+@description: error word detector
+"""
 import os
-import re
 import time
+from codecs import open
 
 import numpy as np
 
-from . import config
-from .utils.get_file import get_file
-from .utils.logger import logger
-from .utils.text_utils import uniform, is_alphabet_string, convert_to_unicode, is_chinese_string
-from .utils.tokenizer import Tokenizer
-
-# \u4E00-\u9FA5a-zA-Z0-9+#&\._ : All non-space characters. Will be handled with re_han
-# \r\n|\s : whitespace characters. Will not be handled.
-re_han = re.compile("([\u4E00-\u9Fa5a-zA-Z0-9+#&]+)", re.U)
-re_skip = re.compile("(\r\n\\s)", re.U)
+from pycorrector import config
+from pycorrector.utils.get_file import get_file
+from pycorrector.utils.logger import logger
+from pycorrector.utils.text_utils import uniform, is_alphabet_string, convert_to_unicode, is_chinese_string
+from pycorrector.utils.tokenizer import Tokenizer, split_2_short_text
+from pycorrector.proper_corrector import ProperCorrector
 
 
 class ErrorType(object):
-    # error_type = {"confusion": 1, "word": 2, "char": 3}
     confusion = 'confusion'
     word = 'word'
     char = 'char'
+    proper = 'proper'  # 专名纠错，包括成语纠错、人名纠错等
 
 
 class Detector(object):
@@ -33,18 +29,21 @@ class Detector(object):
         # 语言模型 2.95GB
         'zh_giga.no_cna_cmn.prune01244.klm': 'https://deepspeech.bj.bcebos.com/zh_lm/zh_giga.no_cna_cmn.prune01244.klm',
         # 人民日报训练语言模型 20MB
-        'people_chars_lm.klm': 'https://www.borntowin.cn/mm/emb_models/people_chars_lm.klm'
+        'people_chars_lm.klm': 'https://github.com/shibing624/pycorrector/releases/download/0.4.3/people_chars_lm.klm'
     }
 
-    def __init__(self,
-                 language_model_path=config.language_model_path,
-                 word_freq_path=config.word_freq_path,
-                 custom_word_freq_path='',
-                 custom_confusion_path='',
-                 person_name_path=config.person_name_path,
-                 place_name_path=config.place_name_path,
-                 stopwords_path=config.stopwords_path
-                 ):
+    def __init__(
+            self,
+            language_model_path=config.language_model_path,
+            word_freq_path=config.word_freq_path,
+            custom_word_freq_path='',
+            custom_confusion_path='',
+            person_name_path=config.person_name_path,
+            place_name_path=config.place_name_path,
+            stopwords_path=config.stopwords_path,
+            proper_name_path=config.proper_name_path,
+            stroke_path=config.stroke_path
+    ):
         self.name = 'detector'
         self.language_model_path = language_model_path
         self.word_freq_path = word_freq_path
@@ -64,9 +63,11 @@ class Detector(object):
         self.place_names = None
         self.stopwords = None
         self.tokenizer = None
+        self.proper_corrector = None
+        self.proper_name_path = proper_name_path
+        self.stroke_path = stroke_path
 
     def _initialize_detector(self):
-        t1 = time.time()
         try:
             import kenlm
         except ImportError:
@@ -85,8 +86,7 @@ class Detector(object):
                 verbose=1
             )
         self.lm = kenlm.Model(self.language_model_path)
-        t2 = time.time()
-        logger.debug('Loaded language model: %s, spend: %.3f s.' % (self.language_model_path, t2 - t1))
+        logger.debug('Loaded language model: %s' % self.language_model_path)
 
         # 词、频数dict
         self.word_freq = self.load_word_freq_dict(self.word_freq_path)
@@ -102,10 +102,11 @@ class Detector(object):
         self.custom_word_freq.update(self.place_names)
         self.custom_word_freq.update(self.stopwords)
         self.word_freq.update(self.custom_word_freq)
-        self.tokenizer = Tokenizer(dict_path=self.word_freq_path, custom_word_freq_dict=self.custom_word_freq,
+        self.tokenizer = Tokenizer(dict_path=self.word_freq_path,
+                                   custom_word_freq_dict=self.custom_word_freq,
                                    custom_confusion_dict=self.custom_confusion)
-        t3 = time.time()
-        logger.debug('Loaded dict file, spend: %.3f s.' % (t3 - t2))
+        self.proper_corrector = ProperCorrector(proper_name_path=self.proper_name_path,
+                                                stroke_path=self.stroke_path)
         self.initialized_detector = True
 
     def check_detector_initialized(self):
@@ -125,7 +126,7 @@ class Detector(object):
                 logger.warning('file not found.%s' % path)
                 return word_freq
             else:
-                with codecs.open(path, 'r', encoding='utf-8') as f:
+                with open(path, 'r', encoding='utf-8') as f:
                     for line in f:
                         line = line.strip()
                         if line.startswith('#'):
@@ -151,7 +152,7 @@ class Detector(object):
                 logger.warning('file not found.%s' % path)
                 return confusion
             else:
-                with codecs.open(path, 'r', encoding='utf-8') as f:
+                with open(path, 'r', encoding='utf-8') as f:
                     for line in f:
                         line = line.strip()
                         if line.startswith('#'):
@@ -292,7 +293,7 @@ class Detector(object):
         scores = scores.flatten()
         maybe_error_indices = np.where((y_score > threshold) & (scores < median))
         # 取全部疑似错误字的index
-        result = list(maybe_error_indices[0])
+        result = [int(i) for i in maybe_error_indices[0]]
         return result
 
     @staticmethod
@@ -334,41 +335,6 @@ class Detector(object):
             result = True
         return result
 
-    @staticmethod
-    def split_2_short_text(text, include_symbol=False):
-        """
-        长句切分为短句
-        :param text: str
-        :param include_symbol: bool
-        :return: (sentence, idx)
-        """
-        result = []
-        blocks = re_han.split(text)
-        start_idx = 0
-        for blk in blocks:
-            if not blk:
-                continue
-            if include_symbol:
-                result.append((blk, start_idx))
-            else:
-                if re_han.match(blk):
-                    result.append((blk, start_idx))
-            start_idx += len(blk)
-        return result
-
-    @staticmethod
-    def split_text_by_maxlen(text, maxlen=512):
-        """
-        长句切分为短句，每个短句maxlen个字
-        :param text: str
-        :param maxlen: int, 最大长度
-        :return: list, (sentence, idx)
-        """
-        result = []
-        for i in range(0, len(text), maxlen):
-            result.append((text[i:i + maxlen], i))
-        return result
-
     def detect(self, text):
         """
         文本错误检测
@@ -384,15 +350,21 @@ class Detector(object):
         text = convert_to_unicode(text)
         # 文本归一化
         text = uniform(text)
-        # 长句切分为短句
-        blocks = self.split_2_short_text(text)
-        for blk, idx in blocks:
-            maybe_errors += self.detect_short(blk, idx)
+        # 文本切分为句子
+        sentences = split_2_short_text(text)
+        for sentence, idx in sentences:
+            maybe_errors += self.detect_sentence(sentence, idx)[0]
         return maybe_errors
 
-    def detect_short(self, sentence, start_idx=0):
+    def detect_sentence(self, sentence, start_idx=0, **kwargs):
         """
-        检测句子中的疑似错误信息，包括[词、位置、错误类型]
+        检测句子中的疑似错误字词，包括[词、位置、错误类型]
+
+        检测逻辑：
+        1. 自定义混淆集
+        2. 专名错误检测
+        3. 词错误
+        4. 字错误
         :param sentence:
         :param start_idx:
         :return: list[list], [error_word, begin_pos, end_pos, error_type]
@@ -400,15 +372,21 @@ class Detector(object):
         maybe_errors = []
         # 初始化
         self.check_detector_initialized()
-        # 自定义混淆集加入疑似错误词典
+        # 1. 自定义混淆集加入疑似错误词典
         for confuse in self.custom_confusion:
             idx = sentence.find(confuse)
             if idx > -1:
                 maybe_err = [confuse, idx + start_idx, idx + len(confuse) + start_idx, ErrorType.confusion]
                 self._add_maybe_error_item(maybe_err, maybe_errors)
 
+        # 2. 专名错误检测
+        _, proper_details = self.proper_corrector.proper_correct(sentence, start_idx=start_idx, **kwargs)
+        for error_word, corrected_word, begin_idx, end_idx in proper_details:
+            maybe_err = [error_word, begin_idx, end_idx, ErrorType.proper]
+            self._add_maybe_error_item(maybe_err, maybe_errors)
+
+        # 3. 词错误
         if self.is_word_error_detect:
-            # 切词
             tokens = self.tokenizer.tokenize(sentence)
             # 未登录词加入疑似错误词典
             for token, begin_idx, end_idx in tokens:
@@ -421,8 +399,8 @@ class Detector(object):
                 maybe_err = [token, begin_idx + start_idx, end_idx + start_idx, ErrorType.word]
                 self._add_maybe_error_item(maybe_err, maybe_errors)
 
+        # 4. 字错误，语言模型检测疑似错误字
         if self.is_char_error_detect:
-            # 语言模型检测疑似错误字
             try:
                 ngram_avg_scores = []
                 for n in [2, 3]:
@@ -460,4 +438,4 @@ class Detector(object):
                 logger.warn("index error, sentence:" + sentence + str(ie))
             except Exception as e:
                 logger.warn("detect error, sentence:" + sentence + str(e))
-        return sorted(maybe_errors, key=lambda k: k[1], reverse=False)
+        return sorted(maybe_errors, key=lambda k: k[1], reverse=False), proper_details

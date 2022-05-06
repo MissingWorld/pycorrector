@@ -1,15 +1,17 @@
+# -*- coding: utf-8 -*-
 """
-@Time   :   2021-02-03 21:14:27
-@File   :   macbert_corrector_test.py
-@Author :   Abtion
-@Email  :   abtion{at}outlook.com
+@author:XuMing(xuming624@qq.com), Abtion(abtion@outlook.com)
+@description:
 """
 import sys
+import time
 
 sys.path.append("../")
 from pycorrector.macbert import macbert_corrector
 
 error_sentences = [
+    '首金得主杨倩、三跳满分的全红婵、举重纪录创造者李雯雯……“00后”选手闪曜奥运舞台。',
+    '首金得主银色的k2p, ，。，mM是MTKkE2.iiKz还是舞台。',
     '真麻烦你了。希望你们好好的跳无',
     '少先队员因该为老人让坐',
     '少 先  队 员 因 该 为 老人让坐',
@@ -54,10 +56,14 @@ badcase = ['这个跟 原木纯品 那个啥区别？不是原木纸浆做的?',
            '生产日期怎么样 新嘛',
            '插上去的时候是驱蚊液放下面的吗？',
            '橄榄的和这款哪个比较好用？味道都是一样的么？',
+           '妈妈说：”以后做错了要主动人错哦，别赖。“，我说：”我知道了。“',
+           '他在唱”听妈妈的话“，真的很好听呢',
+           '我最爱看的是《巴黎圣母院》这书，里面思想深邃，值得回味。',
            ]
 error_sentences.extend(badcase)
-
+start = time.time()
 bertCorrector = macbert_corrector.MacBertCorrector()
 for line in error_sentences:
     correct_sent, err = bertCorrector.macbert_correct(line)
-    print("original sentence:{} => {}, err:{}".format(line, correct_sent, err))
+    print("original sentence:{} => {} err:{}".format(line, correct_sent, err))
+print('time spend:', time.time() - start, ' sentence count:', len(error_sentences))

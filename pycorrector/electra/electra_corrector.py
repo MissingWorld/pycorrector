@@ -9,18 +9,22 @@ import sys
 import time
 
 import torch
+from transformers import pipeline, ElectraForPreTraining
 
 sys.path.append('../..')
-from pycorrector.transformers import pipeline, ElectraForPreTraining
 
 from pycorrector.utils.text_utils import is_chinese_string, convert_to_unicode
 from pycorrector.utils.logger import logger
 from pycorrector.corrector import Corrector
+from pycorrector.utils.tokenizer import split_2_short_text
 from pycorrector import config
+
+device_id = 0 if torch.cuda.is_available() else -1
 
 
 class ElectraCorrector(Corrector):
-    def __init__(self, d_model_dir=config.electra_D_model_dir, g_model_dir=config.electra_G_model_dir):
+    def __init__(self, d_model_dir=config.electra_D_model_dir, g_model_dir=config.electra_G_model_dir,
+                 device=device_id):
         super(ElectraCorrector, self).__init__()
         self.name = 'electra_corrector'
         t1 = time.time()
@@ -28,7 +32,7 @@ class ElectraCorrector(Corrector):
             "fill-mask",
             model=g_model_dir,
             tokenizer=g_model_dir,
-            device=0,  # gpu device id
+            device=device,  # gpu device id
         )
         self.d_model = ElectraForPreTraining.from_pretrained(d_model_dir)
 
@@ -58,7 +62,7 @@ class ElectraCorrector(Corrector):
         # 编码统一，utf-8 to unicode
         text = convert_to_unicode(text)
         # 长句切分为短句
-        blocks = self.split_2_short_text(text, include_symbol=True)
+        blocks = split_2_short_text(text, include_symbol=True)
         for blk, start_idx in blocks:
             error_ids = self.electra_detect(blk)
             sentence_lst = list(blk)
@@ -82,7 +86,7 @@ class ElectraCorrector(Corrector):
                         if candidates:
                             for token_str in top_tokens:
                                 if token_str in candidates:
-                                    details.append([s, token_str, start_idx + idx, start_idx + idx + 1])
+                                    details.append((s, token_str, start_idx + idx, start_idx + idx + 1))
                                     sentence_lst[idx] = token_str
                                     break
                     # 还原

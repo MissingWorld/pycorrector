@@ -8,19 +8,22 @@ import operator
 import os
 import sys
 import time
-import kenlm  # import kenlm before torch, when torch>=1.7.1
+import torch
+from transformers import pipeline
 
 sys.path.append('../..')
 from pycorrector.utils.text_utils import is_chinese_string, convert_to_unicode
 from pycorrector.utils.logger import logger
 from pycorrector.corrector import Corrector
-from pycorrector.transformers import pipeline
 from pycorrector import config
+from pycorrector.utils.tokenizer import split_text_by_maxlen
+
 pwd_path = os.path.abspath(os.path.dirname(__file__))
+device_id = 0 if torch.cuda.is_available() else -1
 
 
 class BertCorrector(Corrector):
-    def __init__(self, bert_model_dir=config.bert_model_dir):
+    def __init__(self, bert_model_dir=config.bert_model_dir, device=device_id):
         super(BertCorrector, self).__init__()
         self.name = 'bert_corrector'
         t1 = time.time()
@@ -28,7 +31,7 @@ class BertCorrector(Corrector):
             'fill-mask',
             model=bert_model_dir,
             tokenizer=bert_model_dir,
-            device=0,  # gpu device id
+            device=device,  # gpu device id
         )
         if self.model:
             self.mask = self.model.tokenizer.mask_token
@@ -46,7 +49,7 @@ class BertCorrector(Corrector):
         # 编码统一，utf-8 to unicode
         text = convert_to_unicode(text)
         # 长句切分为短句
-        blocks = self.split_text_by_maxlen(text, maxlen=128)
+        blocks = split_text_by_maxlen(text, maxlen=128)
         for blk, start_idx in blocks:
             blk_new = ''
             for idx, s in enumerate(blk):
@@ -69,7 +72,7 @@ class BertCorrector(Corrector):
                         if candidates:
                             for token_str in top_tokens:
                                 if token_str in candidates:
-                                    details.append([s, token_str, start_idx + idx, start_idx + idx + 1])
+                                    details.append((s, token_str, start_idx + idx, start_idx + idx + 1))
                                     s = token_str
                                     break
                 blk_new += s

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-# Author: XuMing(xuming624@qq.com)
-# Brief: 
-from __future__ import print_function
+"""
+@author:XuMing(xuming624@qq.com)
+@description:
+"""
 
 import sys
 
@@ -15,12 +16,6 @@ if sys.version_info < (3,):
 
 with open('README.md', 'r', encoding='utf-8') as f:
     readme = f.read()
-
-with open('LICENSE', 'r', encoding='utf-8') as f:
-    license = f.read()
-
-with open('requirements.txt', 'r', encoding='utf-8') as f:
-    reqs = f.read()
 
 setup(
     name='pycorrector',
@@ -41,16 +36,18 @@ setup(
         'Natural Language :: Chinese (Traditional)',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
         'Topic :: Text Processing :: Linguistic',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
     ],
     platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
-    keywords='NLP,correction,Chinese error corrector,corrector',
-    install_requires=reqs.strip().split('\n'),
+    keywords='NLP,correction,Chinese error correction,pycorrector',
+    install_requires=[
+        "jieba",
+        "pypinyin",
+        "numpy",
+        "six"
+    ],
     packages=find_packages(exclude=['tests']),
     package_dir={'pycorrector': 'pycorrector'},
-    package_data={'pycorrector': ['*.*', '../LICENSE', '../README.*', '../*.txt', 'data/*', 'data/en/big.txt',
-                                  'utils/*.', 'bert/*', 'deep_context/*', 'conv_seq2seq/*', 'seq2seq_attention/*',
-                                  'transformer/*', 'electra/*']}
+    package_data={'pycorrector': ['*.*', 'data/*', 'data/en/en.json.gz']}
 )

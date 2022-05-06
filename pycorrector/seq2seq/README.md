@@ -7,8 +7,8 @@
 * Luong Attention
 * Conv Seq2Seq model, GPU并行计算，训练加速
 * 训练加速tricks：dataset bucketing, prefetching, token-based batching, gradients accumulation
-* beam search
-* chinese samples: sighan2015 sample data, CGED sample data
+* Beam Search
+* Chinese Samples: sighan2015 sample data, CGED sample data
 
 ## Usage
 
@@ -16,7 +16,21 @@
 * pip安装依赖包
 ```
 torch>=1.4.0
+transformers>=4.4.2
+tensorboardX
 ```
+
+## Demo
+
+- bertseq2seq demo
+
+示例[seq2seq_demo.py](../../examples/seq2seq_demo.py)
+```
+cd ../../examples
+python seq2seq_demo.py --do_train --do_predict
+```
+
+## Detail
 
 ### Preprocess
 
